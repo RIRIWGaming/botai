@@ -24,7 +24,8 @@
   "canvas": "^2.11.2",
   "fluent-ffmpeg": "^2.1.2",
   "mime-types": "^2.1.35",
-  "ytdl-core": "^4.11.1"
+  "ytdl-core": "^4.11.1",
+  "qrcode": "^1.5.3"
 }
 
 }
