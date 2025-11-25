@@ -15,30 +15,26 @@ import * as sticker from "./lib/sticker.js";
 import * as dl from "./lib/download.js";
 import * as tools from "./lib/tools.js";
 
-// GANTI DENGAN NOMOR KAMU 
-// Format WA JID: 628xxxxxx@s.whatsapp.net
-const ownerNumber = "62895339344449@s.whatsapp.net";
-
-const config = JSON.parse(fs.readFileSync('./config.json'));
+const config = JSON.parse(fs.readFileSync("./config.json"));
 
 async function start() {
-  const { state, saveCreds } = await useMultiFileAuthState('./session');
+  const { state, saveCreds } = await useMultiFileAuthState("./session");
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
-    printQRInTerminal: false, // kita tidak pakai terminal QR
-    logger: pino({ level: 'silent' }),
-    auth: state
+    printQRInTerminal: false, // QR tidak tampil di terminal
+    logger: pino({ level: "silent" }),
+    auth: state,
   });
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on("creds.update", saveCreds);
 
   // Load commands folder
-  const commands = await loadCommands('./commands');
+  const commands = await loadCommands("./commands");
 
-  // =============== HANDLE MESSAGE ===============
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  // ================== MESSAGE HANDLER ==================
+  sock.ev.on("messages.upsert", async ({ messages }) => {
     try {
       const m = messages[0];
       if (!m.message) return;
@@ -48,13 +44,13 @@ async function start() {
       let text =
         m.message.conversation ||
         m.message.extendedTextMessage?.text ||
-        '';
+        "";
 
-      const prefix = config.prefix || '!';
+      const prefix = config.prefix || "!";
 
-      // ===== AI Auto Reply (private chat only)
+      // AI Auto Reply (private chat only)
       if (text && !text.startsWith(prefix)) {
-        if (!from.endsWith('@g.us')) {
+        if (!from.endsWith("@g.us")) {
           const reply = await ai.aiChat(text).catch(() => null);
           if (reply) {
             await sock.sendMessage(from, { text: reply });
@@ -63,7 +59,6 @@ async function start() {
         }
       }
 
-      // Command tidak pakai prefix
       if (!text.startsWith(prefix)) return;
 
       const withoutPrefix = text.slice(prefix.length).trim();
@@ -71,7 +66,9 @@ async function start() {
 
       const cmd = commands[cmdName];
       if (!cmd) {
-        await sock.sendMessage(from, { text: 'Perintah tidak ditemukan. Ketik !menu' });
+        await sock.sendMessage(from, {
+          text: "Perintah tidak ditemukan. Ketik !menu",
+        });
         return;
       }
 
@@ -81,30 +78,28 @@ async function start() {
         args,
         from,
         config,
-        utils: { sticker, dl, tools }
+        utils: { sticker, dl, tools },
       });
-
     } catch (err) {
       console.error(err);
     }
   });
 
-  // =============== WELCOME / GOODBYE ===============
-  sock.ev.on('group-participants.update', async (update) => {
+  // ================== WELCOME / GOODBYE ==================
+  sock.ev.on("group-participants.update", async (update) => {
     try {
       const gid = update.id;
       const action = update.action;
-
       for (const p of update.participants) {
-        if (action === 'add') {
+        if (action === "add") {
           await sock.sendMessage(gid, {
-            text: `Selamat datang @${p.split('@')[0]}!`,
-            mentions: [p]
+            text: `Selamat datang @${p.split("@")[0]}!`,
+            mentions: [p],
           });
-        } else if (action === 'remove') {
+        } else if (action === "remove") {
           await sock.sendMessage(gid, {
-            text: `Selamat tinggal @${p.split('@')[0]}!`,
-            mentions: [p]
+            text: `Selamat tinggal @${p.split("@")[0]}!`,
+            mentions: [p],
           });
         }
       }
@@ -113,29 +108,22 @@ async function start() {
     }
   });
 
-  // =============== CONNECTION HANDLER ===============
+  // ================== QR HANDLER (SAVE PNG) ==================
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // ===== QR DITERIMA → KIRIM FOTO KE NOMOR KAMU
+    // QR akan disimpan sebagai qr.png
     if (qr) {
-      console.log("QR ditemukan → membuat QR PNG untuk dikirim...");
-
+      console.log("QR ditemukan → membuat file qr.png...");
       try {
-        const qrBuffer = await qrcode.toBuffer(qr);
-
-        await sock.sendMessage(ownerNumber, {
-          image: qrBuffer,
-          caption: "Silakan SCAN QR ini untuk login bot kamu 😊"
-        });
-
-        console.log("QR terkirim ke WhatsApp kamu!");
+        await qrcode.toFile("qr.png", qr);
+        console.log("QR berhasil disimpan sebagai qr.png");
+        console.log("Download di Railway → Deployments → Files");
       } catch (err) {
-        console.error("Gagal membuat/mengirim QR:", err);
+        console.error("Gagal membuat QR PNG:", err);
       }
     }
 
-    // ===== Connection events
     if (connection === "open") {
       console.log("Bot connected!");
     }
@@ -143,7 +131,6 @@ async function start() {
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode;
 
-      // Jika bukan logout → reconnect
       if (reason !== DisconnectReason.loggedOut) {
         console.log("Koneksi terputus, mencoba reconnect...");
         start();
@@ -153,7 +140,7 @@ async function start() {
     }
   });
 
-  console.log("Bot berjalan. QR akan dikirim ke nomor kamu jika diperlukan.");
+  console.log("Bot berjalan. QR akan disimpan sebagai qr.png jika diminta login.");
 }
 
 start();
